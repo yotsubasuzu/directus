@@ -11,6 +11,7 @@ import { applyFunctionToColumnName } from '../utils/apply-function-to-column-nam
 import applyQuery from '../utils/apply-query.js';
 import { getColumn } from '../utils/get-column.js';
 import { stripFunction } from '../utils/strip-function.js';
+import { fakePromise } from '../utils/fakePromise.js';
 
 type RunASTOptions = {
 	/**
@@ -44,7 +45,7 @@ export default async function runAST(
 ): Promise<null | Item | Item[]> {
 	const ast = cloneDeep(originalAST);
 
-	const knex = options?.knex || getDatabase();
+	const knex = fakePromise(options?.knex || getDatabase());
 
 	if (ast.type === 'a2o') {
 		const results: { [collection: string]: null | Item | Item[] } = {};
@@ -72,20 +73,19 @@ export default async function runAST(
 		);
 
 		// The actual knex query builder instance. This is a promise that resolves with the raw items from the db
-		const dbQuery = getDBQuery(schema, knex, collection, fieldNodes, query);
+		const dbQuery = await getDBQuery(schema, knex, collection, fieldNodes, query);
 
-		const rawItems: Item | Item[] = await dbQuery;
+		const rawItems: Item | Item[] = await dbQuery.removeFakePromise();
 
 		if (!rawItems) return null;
 
 		// Run the items through the special transforms
 		const payloadService = new PayloadService(collection, { knex, schema });
 		let items: null | Item | Item[] = await payloadService.processValues('read', rawItems);
-
 		if (!items || items['length'] === 0) return items;
 
 		// Apply the `_in` filters to the nested collection batches
-		const nestedNodes = applyParentFilters(schema, nestedCollectionNodes, items);
+		const nestedNodes = await applyParentFilters(schema, nestedCollectionNodes, items);
 
 		for (const nestedNode of nestedNodes) {
 			let nestedItems: Item[] | null = [];
@@ -107,7 +107,7 @@ export default async function runAST(
 					nestedItems = (await runAST(node, schema, { knex, nested: true })) as Item[] | null;
 
 					if (nestedItems) {
-						items = mergeWithParentItems(schema, nestedItems, items!, nestedNode) ?? null;
+						items = await mergeWithParentItems(schema, nestedItems, items!, nestedNode) ?? null;
 					}
 
 					if (!nestedItems || nestedItems.length < env['RELATIONAL_BATCH_SIZE']) {
@@ -125,7 +125,7 @@ export default async function runAST(
 
 				if (nestedItems) {
 					// Merge all fetched nested records with the parent items
-					items = mergeWithParentItems(schema, nestedItems, items!, nestedNode) ?? null;
+					items = await mergeWithParentItems(schema, nestedItems, items!, nestedNode) ?? null;
 				}
 			}
 		}
@@ -135,7 +135,7 @@ export default async function runAST(
 		// and nesting is done, we parse through the output structure, and filter out all non-requested
 		// fields
 		if (options?.nested !== true && options?.stripNonRequested !== false) {
-			items = removeTemporaryFields(schema, items!, originalAST, primaryKeyField);
+			items = await removeTemporaryFields(schema, items!, originalAST, primaryKeyField);
 		}
 
 		return items;
@@ -148,8 +148,8 @@ async function parseCurrentLevel(
 	children: (NestedCollectionNode | FieldNode | FunctionFieldNode)[],
 	query: Query
 ) {
-	const primaryKeyField = schema.collections[collection]!.primary;
-	const columnsInCollection = Object.keys(schema.collections[collection]!.fields);
+	const primaryKeyField = (await schema.getCollection(collection))!.primary;
+	const columnsInCollection = Object.keys(await schema.getFields(collection));
 
 	const columnsToSelectInternal: string[] = [];
 	const nestedCollectionNodes: NestedCollectionNode[] = [];
@@ -209,7 +209,7 @@ async function parseCurrentLevel(
 function getColumnPreprocessor(knex: Knex, schema: SchemaOverview, table: string) {
 	const helpers = getHelpers(knex);
 
-	return function (fieldNode: FieldNode | FunctionFieldNode | M2ONode): Knex.Raw<string> {
+	return async function (fieldNode: FieldNode | FunctionFieldNode | M2ONode): Promise<Knex.Raw<string>> {
 		let alias = undefined;
 
 		if (fieldNode.name !== fieldNode.fieldKey) {
@@ -219,9 +219,9 @@ function getColumnPreprocessor(knex: Knex, schema: SchemaOverview, table: string
 		let field;
 
 		if (fieldNode.type === 'field' || fieldNode.type === 'functionField') {
-			field = schema.collections[table]!.fields[stripFunction(fieldNode.name)];
+			field = await schema.getField(table, stripFunction(fieldNode.name));
 		} else {
-			field = schema.collections[fieldNode.relation.collection]!.fields[fieldNode.relation.field];
+			field = await schema.getField(fieldNode.relation.collection, fieldNode.relation.field);
 		}
 
 		if (field?.type?.startsWith('geometry')) {
@@ -230,29 +230,36 @@ function getColumnPreprocessor(knex: Knex, schema: SchemaOverview, table: string
 
 		if (fieldNode.type === 'functionField') {
 			return getColumn(knex, table, fieldNode.name, alias, schema, fieldNode.query);
+
 		}
 
 		return getColumn(knex, table, fieldNode.name, alias, schema);
 	};
 }
 
-function getDBQuery(
+async function getDBQuery(
 	schema: SchemaOverview,
 	knex: Knex,
 	table: string,
 	fieldNodes: (FieldNode | FunctionFieldNode)[],
 	query: Query
-): Knex.QueryBuilder {
+): Promise<Knex.QueryBuilder> {
 	const preProcess = getColumnPreprocessor(knex, schema, table);
-	const dbQuery = knex.select(fieldNodes.map(preProcess)).from(table);
+	let fields = []
+
+	for (const fieldNode of fieldNodes) {
+		fields.push(await preProcess(fieldNode));
+	}
+
+	const dbQuery = knex.select(fields).from(table);
 	const queryCopy = clone(query);
 
 	queryCopy.limit = typeof queryCopy.limit === 'number' ? queryCopy.limit : 100;
 
-	return applyQuery(knex, table, dbQuery, queryCopy, schema);
+	return await applyQuery(knex, table, dbQuery, queryCopy, schema);
 }
 
-function applyParentFilters(
+async function applyParentFilters(
 	schema: SchemaOverview,
 	nestedCollectionNodes: NestedCollectionNode[],
 	parentItem: Item | Item[]
@@ -263,7 +270,7 @@ function applyParentFilters(
 		if (!nestedNode.relation) continue;
 
 		if (nestedNode.type === 'm2o') {
-			const foreignField = schema.collections[nestedNode.relation.related_collection!]!.primary;
+			const foreignField = (await schema.getCollection(nestedNode.relation.related_collection!))!.primary;
 			const foreignIds = uniq(parentItems.map((res) => res[nestedNode.relation.field])).filter((id) => id);
 
 			merge(nestedNode, { query: { filter: { [foreignField]: { _in: foreignIds } } } });
@@ -315,7 +322,7 @@ function applyParentFilters(
 	return nestedCollectionNodes;
 }
 
-function mergeWithParentItems(
+async function mergeWithParentItems(
 	schema: SchemaOverview,
 	nestedItem: Item | Item[],
 	parentItem: Item | Item[],
@@ -323,12 +330,13 @@ function mergeWithParentItems(
 ) {
 	const nestedItems = toArray(nestedItem);
 	const parentItems = clone(toArray(parentItem));
+	const collectionInfo = await schema.getCollection(nestedNode.relation.related_collection!);
 
 	if (nestedNode.type === 'm2o') {
 		for (const parentItem of parentItems) {
 			const itemChild = nestedItems.find((nestedItem) => {
 				return (
-					nestedItem[schema.collections[nestedNode.relation.related_collection!]!.primary] ==
+					nestedItem[collectionInfo!.primary] ==
 					parentItem[nestedNode.relation.field]
 				);
 			});
@@ -345,10 +353,10 @@ function mergeWithParentItems(
 
 				return (
 					nestedItem[nestedNode.relation.field] ==
-						parentItem[schema.collections[nestedNode.relation.related_collection!]!.primary] ||
+						parentItem[collectionInfo!.primary] ||
 					nestedItem[nestedNode.relation.field]?.[
-						schema.collections[nestedNode.relation.related_collection!]!.primary
-					] == parentItem[schema.collections[nestedNode.relation.related_collection!]!.primary]
+						collectionInfo!.primary
+					] == parentItem[collectionInfo!.primary]
 				);
 			});
 
@@ -414,13 +422,13 @@ function mergeWithParentItems(
 	return Array.isArray(parentItem) ? parentItems : parentItems[0];
 }
 
-function removeTemporaryFields(
+async function removeTemporaryFields(
 	schema: SchemaOverview,
 	rawItem: Item | Item[],
 	ast: AST | NestedCollectionNode,
 	primaryKeyField: string,
 	parentItem?: Item
-): null | Item | Item[] {
+): Promise<null | Item | Item[]> {
 	const rawItems = cloneDeep(toArray(rawItem));
 	const items: Item[] = [];
 
@@ -450,11 +458,13 @@ function removeTemporaryFields(
 			let item = rawItem;
 
 			for (const nestedNode of nestedCollectionNodes[relatedCollection]!) {
-				item[nestedNode.fieldKey] = removeTemporaryFields(
+				const collection = await schema.getCollection(nestedNode.relation.collection)
+
+				item[nestedNode.fieldKey] = await removeTemporaryFields(
 					schema,
 					item[nestedNode.fieldKey],
 					nestedNode,
-					schema.collections[nestedNode.relation.collection]!.primary,
+					collection!.primary,
 					item
 				);
 			}
@@ -493,13 +503,13 @@ function removeTemporaryFields(
 			let item = rawItem;
 
 			for (const nestedNode of nestedCollectionNodes) {
-				item[nestedNode.fieldKey] = removeTemporaryFields(
+				item[nestedNode.fieldKey] = await removeTemporaryFields(
 					schema,
 					item[nestedNode.fieldKey],
 					nestedNode,
 					nestedNode.type === 'm2o'
-						? schema.collections[nestedNode.relation.related_collection!]!.primary
-						: schema.collections[nestedNode.relation.collection]!.primary,
+						? (await schema.getCollection(nestedNode.relation.related_collection!))!.primary
+						: (await schema.getCollection(nestedNode.relation.collection))!.primary,
 					item
 				);
 			}

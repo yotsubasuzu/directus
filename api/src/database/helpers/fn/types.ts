@@ -22,14 +22,14 @@ export abstract class FnHelper extends DatabaseHelper {
 	abstract hour(table: string, column: string, options?: FnHelperOptions): Knex.Raw;
 	abstract minute(table: string, column: string, options?: FnHelperOptions): Knex.Raw;
 	abstract second(table: string, column: string, options?: FnHelperOptions): Knex.Raw;
-	abstract count(table: string, column: string, options?: FnHelperOptions): Knex.Raw;
+	abstract count(table: string, column: string, options?: FnHelperOptions): Promise<Knex.Raw>;
 
-	protected _relationalCount(table: string, column: string, options?: FnHelperOptions): Knex.Raw {
-		const relation = this.schema.relations.find(
+	protected async _relationalCount(table: string, column: string, options?: FnHelperOptions): Promise<Knex.Raw> {
+		const relation = (await this.schema.getRelations()).find(
 			(relation) => relation.related_collection === table && relation?.meta?.one_field === column
 		);
 
-		const currentPrimary = this.schema.collections[table]!.primary;
+		const currentPrimary = (await this.schema.getCollection(table))!.primary;
 
 		if (!relation) {
 			throw new Error(`Field ${table}.${column} isn't a nested relational collection`);
@@ -41,7 +41,7 @@ export abstract class FnHelper extends DatabaseHelper {
 			.where(relation.field, '=', this.knex.raw(`??.??`, [table, currentPrimary]));
 
 		if (options?.query?.filter) {
-			countQuery = applyFilter(this.knex, this.schema, countQuery, options.query.filter, relation.collection, false);
+			countQuery = await applyFilter(this.knex, this.schema, countQuery, options.query.filter, relation.collection, false);
 		}
 
 		return this.knex.raw('(' + countQuery.toQuery() + ')');

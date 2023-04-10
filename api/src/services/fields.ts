@@ -2,11 +2,10 @@ import SchemaInspector from '@directus/schema';
 import { REGEX_BETWEEN_PARENS } from '@directus/shared/constants';
 import type { Accountability, Field, FieldMeta, RawField, SchemaOverview, Type } from '@directus/shared/types';
 import { addFieldFlag, toArray } from '@directus/shared/utils';
-import type Keyv from 'keyv';
 import type { Knex } from 'knex';
 import type { Column } from 'knex-schema-inspector/dist/types/column';
 import { isEqual, isNil } from 'lodash-es';
-import { clearSystemCache, getCache } from '../cache.js';
+import { getCache } from '../cache.js';
 import { ALIAS_TYPES } from '../constants.js';
 import getDatabase, { getSchemaInspector } from '../database/index.js';
 import { getHelpers, Helpers } from '../database/helpers/index.js';
@@ -22,6 +21,8 @@ import getDefaultValue from '../utils/get-default-value.js';
 import getLocalType from '../utils/get-local-type.js';
 import { RelationsService } from './relations.js';
 import { KNEX_TYPES } from '@directus/shared/constants';
+import type { CacheService } from './cache/cache.js';
+import { clearField } from '../utils/clearSystemCache.js';
 
 export class FieldsService {
 	knex: Knex;
@@ -31,8 +32,8 @@ export class FieldsService {
 	payloadService: PayloadService;
 	schemaInspector: ReturnType<typeof SchemaInspector>;
 	schema: SchemaOverview;
-	cache: Keyv<any> | null;
-	systemCache: Keyv<any>;
+	cache: CacheService | null;
+	systemCache: CacheService;
 
 	constructor(options: AbstractServiceOptions) {
 		this.knex = options.knex || getDatabase();
@@ -140,7 +141,7 @@ export class FieldsService {
 			return data;
 		}) as Field[];
 
-		const knownCollections = Object.keys(this.schema.collections);
+		const knownCollections = Object.keys(await this.schema.getCollections());
 
 		const result = [...columnsWithSystem, ...aliasFieldsAsField].filter((field) =>
 			knownCollections.includes(field.collection)
@@ -251,7 +252,7 @@ export class FieldsService {
 
 		try {
 			const exists =
-				field.field in this.schema.collections[collection]!.fields ||
+				await this.schema.hasField(collection, field.field) ||
 				isNil(
 					await this.knex.select('id').from('directus_fields').where({ collection, field: field.field }).first()
 				) === false;
@@ -331,7 +332,7 @@ export class FieldsService {
 				await this.cache.clear();
 			}
 
-			await clearSystemCache();
+			await this.systemCache.setHashFull(`fields:${collection}`, false);
 		}
 	}
 
@@ -432,7 +433,7 @@ export class FieldsService {
 				await this.cache.clear();
 			}
 
-			await clearSystemCache();
+			await clearField(collection, field.field);
 		}
 	}
 
@@ -458,7 +459,9 @@ export class FieldsService {
 			);
 
 			await this.knex.transaction(async (trx) => {
-				const relations = this.schema.relations.filter((relation) => {
+				const collectionRelations = Object.values(await this.schema.getRelationsForCollection(collection));
+
+				const relations = collectionRelations.filter((relation) => {
 					return (
 						(relation.collection === collection && relation.field === field) ||
 						(relation.related_collection === collection && relation.meta?.one_field === field)
@@ -502,12 +505,10 @@ export class FieldsService {
 					}
 				}
 
+				const fieldInfo = await this.schema.getField(collection, field);
+
 				// Delete field only after foreign key constraints are removed
-				if (
-					this.schema.collections[collection] &&
-					field in this.schema.collections[collection]!.fields &&
-					this.schema.collections[collection]!.fields[field]!.alias === false
-				) {
+				if (fieldInfo?.alias === false) {
 					await trx.schema.table(collection, (table) => {
 						table.dropColumn(field);
 					});
@@ -571,7 +572,7 @@ export class FieldsService {
 				await this.cache.clear();
 			}
 
-			await clearSystemCache();
+			await clearField(collection, field);
 		}
 	}
 

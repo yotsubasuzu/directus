@@ -1,6 +1,6 @@
 import SchemaInspector from '@directus/schema';
 import type { Knex } from 'knex';
-import { getCache, clearSystemCache } from '../cache.js';
+import { getCache } from '../cache.js';
 import { ALIAS_TYPES } from '../constants.js';
 import getDatabase, { getSchemaInspector } from '../database/index.js';
 import { systemCollectionRows } from '../database/system-data/collections/index.js';
@@ -8,7 +8,6 @@ import env from '../env.js';
 import { ForbiddenException, InvalidPayloadException } from '../exceptions/index.js';
 import { FieldsService } from '../services/fields.js';
 import { ItemsService } from '../services/items.js';
-import type Keyv from 'keyv';
 import type { AbstractServiceOptions, Collection, CollectionMeta, MutationOptions } from '../types/index.js';
 import type { Accountability, FieldMeta, RawField, SchemaOverview } from '@directus/shared/types';
 import type { Table } from 'knex-schema-inspector/dist/types/table';
@@ -29,8 +28,8 @@ export class CollectionsService {
 	accountability: Accountability | null;
 	schemaInspector: ReturnType<typeof SchemaInspector>;
 	schema: SchemaOverview;
-	cache: Keyv<any> | null;
-	systemCache: Keyv<any>;
+	cache: CacheService | null;
+	systemCache: CacheService;
 
 	constructor(options: AbstractServiceOptions) {
 		this.knex = options.knex || getDatabase();
@@ -62,7 +61,7 @@ export class CollectionsService {
 			const existingCollections: string[] = [
 				...((await this.knex.select('collection').from('directus_collections'))?.map(({ collection }) => collection) ??
 					[]),
-				...Object.keys(this.schema.collections),
+				...Object.keys(await this.schema.getCollections()),
 			];
 
 			if (existingCollections.includes(payload.collection)) {
@@ -189,7 +188,7 @@ export class CollectionsService {
 				await this.cache.clear();
 			}
 
-			await clearSystemCache();
+			await this.systemCache.setHashFull(`collections`, false);
 		}
 	}
 
@@ -469,7 +468,7 @@ export class CollectionsService {
 				await this.cache.clear();
 			}
 
-			await clearSystemCache();
+			await clearCollection(collectionKeys);
 		}
 	}
 
@@ -535,8 +534,10 @@ export class CollectionsService {
 					await trx('directus_permissions').delete().where('collection', '=', collectionKey);
 					await trx('directus_relations').delete().where({ many_collection: collectionKey });
 
-					const relations = this.schema.relations.filter((relation) => {
-						return relation.collection === collectionKey || relation.related_collection === collectionKey;
+					const collectionRelations = Object.values(await this.schema.getRelationsForCollection(collectionKey))
+
+					const relations = collectionRelations.filter((relation) => {
+						return relation.related_collection === collectionKey;
 					});
 
 					for (const relation of relations) {
@@ -551,7 +552,7 @@ export class CollectionsService {
 						}
 					}
 
-					const a2oRelationsThatIncludeThisCollection = this.schema.relations.filter((relation) => {
+					const a2oRelationsThatIncludeThisCollection = collectionRelations.filter((relation) => {
 						return relation.meta?.one_allowed_collections?.includes(collectionKey);
 					});
 
@@ -604,8 +605,6 @@ export class CollectionsService {
 			if (this.cache && env['CACHE_AUTO_PURGE'] && opts?.autoPurgeCache !== false) {
 				await this.cache.clear();
 			}
-
-			await clearSystemCache();
 		}
 	}
 }

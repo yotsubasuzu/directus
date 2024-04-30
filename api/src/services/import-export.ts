@@ -472,7 +472,6 @@ Your export of ${collection} is ready. <a href="${href}">Click here to view.</a>
 
 	async export_xlsx(
 		input: Record<string, any>[],
-		format: ExportFormat,
 		options?: {
 			includeHeader?: boolean;
 			includeFooter?: boolean;
@@ -481,10 +480,14 @@ Your export of ${collection} is ready. <a href="${href}">Click here to view.</a>
 		const csv_string = this.transform(input, 'csv', options);
 		const workbook = new Excel.Workbook();
 		const sheet = workbook.addWorksheet(options?.filename);
-		const rows = csv_string.split('\r\n');
+		const rows = csv_string.split('\n');
 
 		rows.forEach(row => {
-			sheet.addRow([...row.split(',').map(c => c.replaceAll('"', ''))])
+			sheet.addRow([...row.split(',').map(c => {
+				if (c.includes('T')) c = c.replace('T', ' ');
+				if (c.includes('Z')) c = c.replace('Z', '');
+				c.replaceAll('"', '');
+			})])
 		})
 
 		return await workbook.xlsx.writeBuffer();

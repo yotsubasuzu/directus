@@ -473,7 +473,7 @@ async function exportDataFiles() {
 								value: 'yaml',
 							},
 							{
-								text: 'Xlsx',
+								text: 'XLSX',
 								value: 'xlsx',
 							},
 						]"

@@ -107,7 +107,7 @@ export const respond: RequestHandler = asyncHandler(async (req, res) => {
 		if (req.sanitizedQuery.export === 'xlsx') {
 			res.attachment(`${filename}.xlsx`);
 			res.set('Content-Type', 'application/vnd.ms-excel');
-			const buf = await exportService.export_xlsx(res.locals['payload']?.data, 'xlsx', { filename: filename });
+			const buf = await exportService.export_xlsx(res.locals['payload']?.data, { filename: filename });
 			return res.status(200).end(buf);
 		}
 	}

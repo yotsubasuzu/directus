@@ -472,6 +472,10 @@ async function exportDataFiles() {
 								text: t('yaml'),
 								value: 'yaml',
 							},
+							{
+								text: 'Xlsx',
+								value: 'xlsx',
+							},
 						]"
 					/>
 				</div>

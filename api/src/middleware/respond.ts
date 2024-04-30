@@ -103,6 +103,13 @@ export const respond: RequestHandler = asyncHandler(async (req, res) => {
 			res.set('Content-Type', 'text/yaml');
 			return res.status(200).send(exportService.transform(res.locals['payload']?.data, 'yaml'));
 		}
+
+		if (req.sanitizedQuery.export === 'xlsx') {
+			res.attachment(`${filename}.xlsx`);
+			res.set('Content-Type', 'application/vnd.ms-excel');
+			const buf = await exportService.export_xlsx(res.locals['payload']?.data, 'xlsx', { filename: filename });
+			return res.status(200).end(buf);
+		}
 	}
 
 	if (Buffer.isBuffer(res.locals['payload'])) {

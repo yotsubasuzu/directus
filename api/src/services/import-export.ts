@@ -31,11 +31,12 @@ import { FilesService } from './files.js';
 import { ItemsService } from './items.js';
 import { NotificationsService } from './notifications.js';
 import { UsersService } from './users.js';
+import Excel from 'exceljs';
 
 const env = useEnv();
 const logger = useLogger();
 
-type ExportFormat = 'csv' | 'json' | 'xml' | 'yaml';
+type ExportFormat = 'csv' | 'json' | 'xml' | 'yaml' | 'xlsx';
 
 export class ImportService {
 	knex: Knex;
@@ -270,6 +271,7 @@ export class ExportService {
 				json: 'application/json',
 				xml: 'text/xml',
 				yaml: 'text/yaml',
+				xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 			};
 
 			const database = getDatabase();
@@ -466,5 +468,25 @@ Your export of ${collection} is ready. <a href="${href}">Click here to view.</a>
 		}
 
 		throw new ServiceUnavailableError({ service: 'export', reason: `Illegal export type used: "${format}"` });
+	}
+
+	async export_xlsx(
+		input: Record<string, any>[],
+		format: ExportFormat,
+		options?: {
+			includeHeader?: boolean;
+			includeFooter?: boolean;
+			filename?: string;
+		}) {
+		const csv_string = this.transform(input, 'csv', options);
+		const workbook = new Excel.Workbook();
+		const sheet = workbook.addWorksheet(options?.filename);
+		const rows = csv_string.split('\r\n');
+
+		rows.forEach(row => {
+			sheet.addRow([...row.split(',').map(c => c.replaceAll('"', ''))])
+		})
+
+		return await workbook.xlsx.writeBuffer();
 	}
 }

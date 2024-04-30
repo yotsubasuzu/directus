@@ -477,19 +477,27 @@ Your export of ${collection} is ready. <a href="${href}">Click here to view.</a>
 			includeFooter?: boolean;
 			filename?: string;
 		}) {
-		const csv_string = this.transform(input, 'csv', options);
 		const workbook = new Excel.Workbook();
 		const sheet = workbook.addWorksheet(options?.filename);
-		const rows = csv_string.split('\n');
 
-		rows.forEach(row => {
-			sheet.addRow([...row.split(',').map(c => {
-				if (c.includes('T')) c = c.replace('T', ' ');
-				if (c.includes('Z')) c = c.replace('Z', '');
-				c.replaceAll('"', '');
-			})])
-		})
+		const headers = Object.keys(input[0]);
+
+		sheet.columns = [...headers.map(h => {
+			return {
+				'header': transformString(h),
+				'key': h
+			}
+		})];
+
+		sheet.addRows(input);
 
 		return await workbook.xlsx.writeBuffer();
+
+		function transformString (inputString: string) {
+			const words = inputString.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1));
+			return words.join(' ');
+		}
 	}
+
+
 }

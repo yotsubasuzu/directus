@@ -1,4 +1,4 @@
-import { addTokenToURL } from './api';
+import { addTokenToURL } from '../api';
 import { getPublicURL } from './get-root-path';
 
 export function getAssetUrl(filename: string, isDownload?: boolean): string {

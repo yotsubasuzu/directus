@@ -1,6 +1,6 @@
-import api from '@/api';
-import { Collection } from '@/types/collections';
-import { adjustFieldsForDisplays } from '@/utils/adjust-fields-for-displays';
+import { useApi } from '@directus/extensions-sdk';
+import { AppCollection } from '@directus/types';
+import { adjustFieldsForDisplays } from '../utils/adjust-fields-for-displays';
 import { isSystemCollection } from '@directus/system-data';
 import { getEndpoint, getFieldsFromTemplate } from '@directus/utils';
 import { Ref, computed, ref, watch } from 'vue';
@@ -13,13 +13,14 @@ type UsableTemplateData = {
 };
 
 export function useTemplateData(
-	collection: Ref<Collection | null>,
+	collection: Ref<AppCollection | null>,
 	primaryKey: Ref<string>,
 	template?: Ref<string>,
 ): UsableTemplateData {
 	const templateData = ref<Record<string, any>>();
 	const loading = ref(false);
 	const error = ref<any>(null);
+	const api = useApi();
 
 	const fields = computed(() => {
 		const _template = template?.value || collection.value?.meta?.display_template;

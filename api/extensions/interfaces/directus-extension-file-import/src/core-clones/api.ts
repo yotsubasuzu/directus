@@ -1,5 +1,5 @@
 import { useApi } from '@directus/extensions-sdk';
-import { addQueryToPath } from './add-query-to-path';
+import { addQueryToPath } from './utils/add-query-to-path';
 import { AxiosError } from 'axios';
 
 export type RequestError = AxiosError & { response: Response };

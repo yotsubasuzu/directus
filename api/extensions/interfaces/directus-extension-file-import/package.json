@@ -22,6 +22,7 @@
 	},
 	"devDependencies": {
 		"@directus/errors": "0.2.3",
+		"@directus/extensions": "0.3.3",
 		"@directus/extensions-sdk": "10.3.4",
 		"@directus/utils": "11.0.5",
 		"@directus/validation": "0.0.12",

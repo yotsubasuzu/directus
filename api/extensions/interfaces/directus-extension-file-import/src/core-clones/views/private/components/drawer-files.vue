@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useStores } from '@directus/extensions-sdk';
-import FilesNavigation from '@/views/private/components/files-navigation.vue';
+import FilesNavigation from './files-navigation.vue';
 import { getFolderFilter } from '../../../utils/get-folder-filter';
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';

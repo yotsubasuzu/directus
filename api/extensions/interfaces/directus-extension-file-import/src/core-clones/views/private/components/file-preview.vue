@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { addTokenToURL } from '../../../utils/api';
+import { addTokenToURL } from '../../../api';
 import { getRootPath } from '../../../utils/get-root-path';
 import { readableMimeType } from '../../../utils/readable-mime-type';
 import type { File } from '@directus/types';

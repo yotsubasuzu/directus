@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDialogRoute } from '../core-clones/composables/use-dialog-route';
+import { useDialogRoute } from '@/composables/use-dialog-route';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
@@ -14,7 +14,7 @@ const router = useRouter();
 const isOpen = useDialogRoute();
 
 function close() {
-	router.push(props.folder ? { path: `/module-files/folders/${props.folder}` } : { path: '/module-files' });
+	router.push(props.folder ? { path: `/files/folders/${props.folder}` } : { path: '/files' });
 }
 </script>
 

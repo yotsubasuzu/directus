@@ -1,10 +1,10 @@
 import { defineModule } from '@directus/extensions-sdk';
 import AddNew from './routes/add-new.vue';
-import Collection from './routes/collection.vue';
+import Collection from '@/modules/files/routes/collection.vue';
 import Item from './routes/item.vue';
 
 export default defineModule({
-	id: 'module-files',
+	id: 'files',
 	name: '$t:file_library',
 	icon: 'folder',
 	routes: [
@@ -30,7 +30,7 @@ export default defineModule({
 		},
 		{
 			path: 'folders',
-			redirect: '/module-files',
+			redirect: '/files',
 		},
 		{
 			name: 'folders-collection',

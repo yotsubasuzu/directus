@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useApi } from '@directus/extensions-sdk';
-import { useEditsGuard } from '../core-clones/composables/use-edits-guard';
-import { useItem } from '../core-clones/composables/use-item';
-import { useShortcut } from '../core-clones/composables/use-shortcut';
-import { getAssetUrl } from '../core-clones/utils/get-asset-url';
-import { notify } from '../core-clones/utils/notify';
-import { unexpectedError } from '../core-clones/utils/unexpected-error';
+import api from '@/api';
+import { useEditsGuard } from '@/composables/use-edits-guard';
+import { useItem } from '@/composables/use-item';
+import { useShortcut } from '@/composables/use-shortcut';
+import { getAssetUrl } from '@/utils/get-asset-url';
+import { notify } from '@/utils/notify';
+import { unexpectedError } from '@/utils/unexpected-error';
 import CommentsSidebarDetail from '@/views/private/components/comments-sidebar-detail.vue';
-import FilePreviewReplace from '@/views/private/components/file-preview-replace.vue';
+import FilePreviewReplace from '../core-clones/views/private/components/file-preview-replace.vue';
 import FilesNavigation from '@/views/private/components/files-navigation.vue';
 import FolderPicker from '@/views/private/components/folder-picker.vue';
 import ImageEditor from '@/views/private/components/image-editor.vue';
@@ -17,15 +17,14 @@ import type { Field, File } from '@directus/types';
 import { computed, ref, toRefs, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import FileInfoSidebarDetail from '../components/file-info-sidebar-detail.vue';
-import FilesNotFound from './not-found.vue';
+import FileInfoSidebarDetail from '@/modules/files/components/file-info-sidebar-detail.vue';
+import FilesNotFound from '@/modules/files/routes/not-found.vue';
 
 const props = defineProps<{
 	primaryKey: string;
 }>();
 
 const { t } = useI18n();
-const api = useApi();
 
 const router = useRouter();
 
@@ -80,8 +79,8 @@ const fieldsDenyList: string[] = [
 ];
 
 const to = computed(() => {
-	if (item.value && item.value?.folder) return `/module-files/folders/${item.value.folder}`;
-	else return '/module-files';
+	if (item.value && item.value?.folder) return `/files/folders/${item.value.folder}`;
+	else return '/files';
 });
 
 const { moveToDialogActive, moveToFolder, moving, selectedFolder } = useMovetoFolder();
@@ -101,9 +100,9 @@ function navigateBack() {
 	}
 
 	if (item?.value?.folder) {
-		router.push(`/module-files/folders/${item.value.folder}`);
+		router.push(`/files/folders/${item.value.folder}`);
 	} else {
-		router.push('/module-files');
+		router.push('/files');
 	}
 }
 
@@ -113,7 +112,7 @@ function useBreadcrumb() {
 			return [
 				{
 					name: t('file_library'),
-					to: '/module-files',
+					to: '/files',
 				},
 			];
 		}
@@ -121,7 +120,7 @@ function useBreadcrumb() {
 		return [
 			{
 				name: t('file_library'),
-				to: { path: `/module-files/folders/${item.value.folder}` },
+				to: { path: `/files/folders/${item.value.folder}` },
 			},
 		];
 	});
@@ -150,7 +149,7 @@ async function saveAndStay() {
 
 async function saveAsCopyAndNavigate() {
 	const newPrimaryKey = await saveAsCopy();
-	if (newPrimaryKey) router.push(`/module-files/${newPrimaryKey}`);
+	if (newPrimaryKey) router.push(`/files/${newPrimaryKey}`);
 }
 
 async function deleteAndQuit() {

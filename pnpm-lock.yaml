@@ -116,6 +116,9 @@ importers:
       '@rollup/plugin-virtual':
         specifier: 3.0.2
         version: 3.0.2(rollup@4.10.0)
+      '@types/mmmagic':
+        specifier: 0.4.33
+        version: 0.4.33
       argon2:
         specifier: 0.31.2
         version: 0.31.2
@@ -263,6 +266,9 @@ importers:
       minimatch:
         specifier: 9.0.3
         version: 9.0.3
+      mmmagic:
+        specifier: 0.5.3
+        version: 0.5.3
       ms:
         specifier: 2.1.3
         version: 2.1.3
@@ -894,8 +900,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(eslint@8.56.0)
       eslint-plugin-prettier:
-        specifier: npm:@paescuj/eslint-plugin-prettier@5.0.1-1
-        version: /@paescuj/eslint-plugin-prettier@5.0.1-1(eslint-config-prettier@9.1.0)(eslint@8.56.0)(prettier@3.1.0)
+        specifier: 5.0.1
+        version: 5.0.1(eslint-config-prettier@9.1.0)(eslint@8.56.0)(prettier@3.1.0)
       eslint-plugin-react:
         specifier: 7.33.2
         version: 7.33.2(eslint@8.56.0)
@@ -6017,27 +6023,6 @@ packages:
       '@otplib/plugin-thirty-two': 12.0.1
     dev: false
 
-  /@paescuj/eslint-plugin-prettier@5.0.1-1(eslint-config-prettier@9.1.0)(eslint@8.56.0)(prettier@3.1.0):
-    resolution: {integrity: sha512-gc+FaHyaGEnlcjN9n/bjXxa8CRxmkZRZTHkclaePXNgHSMIqgucFukE+4N1PYnSza2CnRijLjpRo8Z6UiGmNUA==}
-    engines: {node: ^14.18.0 || >=16.0.0}
-    peerDependencies:
-      '@types/eslint': '>=8.0.0'
-      eslint: '>=8.0.0'
-      eslint-config-prettier: '*'
-      prettier: '>=3.0.0'
-    peerDependenciesMeta:
-      '@types/eslint':
-        optional: true
-      eslint-config-prettier:
-        optional: true
-    dependencies:
-      eslint: 8.56.0
-      eslint-config-prettier: 9.1.0(eslint@8.56.0)
-      prettier: 3.1.0
-      prettier-linter-helpers: 1.0.0
-      synckit: 0.8.6
-    dev: true
-
   /@phc/format@1.0.0:
     resolution: {integrity: sha512-m7X9U6BG2+J+R1lSOdCiITLLrxm+cWlNI3HUFA92oLO77ObGNzaKdh8pMLqdZcshtkKuV84olNNXDfMc4FezBQ==}
     engines: {node: '>=10'}
@@ -7737,6 +7722,12 @@ packages:
   /@types/minimist@1.2.5:
     resolution: {integrity: sha512-hov8bUuiLiyFPGyFPE1lwWhmzYbirOXQNNo40+y3zow8aFVTeyn3VWL0VFFfdNddA8S4Vf0Tc062rzyNr7Paag==}
     dev: true
+
+  /@types/mmmagic@0.4.33:
+    resolution: {integrity: sha512-zbI+L0MkFd9GiPGAtlwMl6/mwnQNG4Ag5Ic03f3c9I2FxM9HseAFkl9NsS4y0fdU2nMEhbxvlGPLdDOtWuF0mw==}
+    dependencies:
+      '@types/node': 18.19.17
+    dev: false
 
   /@types/ms@0.7.34:
     resolution: {integrity: sha512-nG96G3Wp6acyAgJqGasjODb+acrI7KltPiRxzHPXnP3NgI28bpQDRv53olbqGXbfcgF5aiiHmO3xpwEpS5Ld9g==}
@@ -11236,6 +11227,27 @@ packages:
       mdast-util-from-markdown: 0.8.5
     transitivePeerDependencies:
       - supports-color
+    dev: true
+
+  /eslint-plugin-prettier@5.0.1(eslint-config-prettier@9.1.0)(eslint@8.56.0)(prettier@3.1.0):
+    resolution: {integrity: sha512-m3u5RnR56asrwV/lDC4GHorlW75DsFfmUcjfCYylTUs85dBRnB7VM6xG8eCMJdeDRnppzmxZVf1GEPJvl1JmNg==}
+    engines: {node: ^14.18.0 || >=16.0.0}
+    peerDependencies:
+      '@types/eslint': '>=8.0.0'
+      eslint: '>=8.0.0'
+      eslint-config-prettier: '*'
+      prettier: '>=3.0.0'
+    peerDependenciesMeta:
+      '@types/eslint':
+        optional: true
+      eslint-config-prettier:
+        optional: true
+    dependencies:
+      eslint: 8.56.0
+      eslint-config-prettier: 9.1.0(eslint@8.56.0)
+      prettier: 3.1.0
+      prettier-linter-helpers: 1.0.0
+      synckit: 0.8.6
     dev: true
 
   /eslint-plugin-react@7.33.2(eslint@8.56.0):
@@ -14853,6 +14865,14 @@ packages:
       ufo: 1.3.2
     dev: true
 
+  /mmmagic@0.5.3:
+    resolution: {integrity: sha512-xLqCu7GJYTzJczg0jafXFuh+iPzQL/ru0YYf4GiTTz8Cehru/wiXtUS8Pp8Xi77zNaiVndJ0OO1yAFci6iHyFg==}
+    engines: {node: '>=4.0.0'}
+    requiresBuild: true
+    dependencies:
+      nan: 2.23.0
+    dev: false
+
   /mri@1.1.4:
     resolution: {integrity: sha512-6y7IjGPm8AzlvoUrwAaw1tLnUBudaS3752vcd8JtrpGGQn+rXIe63LFVHm/YMwtqAuh+LJPCFdlLYPWM1nYn6w==}
     engines: {node: '>=4'}
@@ -14912,6 +14932,10 @@ packages:
       object-assign: 4.1.1
       thenify-all: 1.6.0
     dev: true
+
+  /nan@2.23.0:
+    resolution: {integrity: sha512-1UxuyYGdoQHcGg87Lkqm3FzefucTa0NAiOcuRsDmysep3c1LVCRK2krrUDafMWtjSG04htvAmvg96+SDknOmgQ==}
+    dev: false
 
   /nanoid@3.3.7:
     resolution: {integrity: sha512-eSRppjcPIatRIMC1U6UngP8XFcz8MQWGQdt1MTBQ7NaAmvXDfvNxbvWV3x2y6CdEUciCSsDHDQZbhYaB8QEo2g==}

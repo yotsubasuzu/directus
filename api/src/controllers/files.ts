@@ -18,6 +18,8 @@ import { MetaService } from '../services/meta.js';
 import type { PrimaryKey } from '../types/index.js';
 import asyncHandler from '../utils/async-handler.js';
 import { sanitizeQuery } from '../utils/sanitize-query.js';
+import mmm from 'mmmagic';
+import { PassThrough } from 'stream';
 
 const router = express.Router();
 const env = useEnv();
@@ -75,19 +77,80 @@ export const multipartHandler: RequestHandler = (req, res, next) => {
 		payload[fieldname] = fieldValue;
 	});
 
-	busboy.on('file', async (_fieldname, fileStream: BusboyFileStream, { filename, mimeType }) => {
+	busboy.on('file', async (_fieldname, fileStream: BusboyFileStream, { filename }) => {
 		if (!filename) {
 			return busboy.emit('error', new InvalidPayloadError({ reason: `File is missing filename` }));
+		}
+
+		fileCount++;
+
+		// Detect MIME type using mmmagic from the incoming stream
+		const magic = new mmm.Magic(mmm.MAGIC_MIME_TYPE);
+		const CHUNK_LIMIT = 256 * 1024; // 256KB should be enough for detection
+		const chunks: Buffer[] = [];
+		let collected = 0;
+		let finalized = false;
+
+		const finalizeIfNeeded = () => {
+			if (finalized) return;
+			finalized = true;
+			tryDone();
+		};
+
+		fileStream.on('error', () => finalizeIfNeeded());
+		fileStream.on('end', () => {});
+		fileStream.on('close', () => finalizeIfNeeded());
+
+		fileStream.pause();
+
+		const mimeType: string | undefined = await new Promise((resolve) => {
+			const finishDetection = () => {
+				const head = Buffer.concat(chunks, collected);
+
+				magic.detect(head, (err: Error | null, result: string | string[]) => {
+					if (err) return resolve(undefined);
+					const value = Array.isArray(result) ? result[0] : result;
+					const mime = (value ?? 'application/octet-stream').split(';')[0]!.trim();
+					resolve(mime);
+				});
+			};
+
+			const onData = (chunk: Buffer) => {
+				if (collected < CHUNK_LIMIT) {
+					chunks.push(chunk);
+					collected += chunk.length;
+				}
+
+				if (collected >= CHUNK_LIMIT) {
+					fileStream.removeListener('data', onData);
+					fileStream.pause();
+					finishDetection();
+				}
+			};
+
+			const onEndOrClose = () => {
+				fileStream.removeListener('data', onData);
+				finishDetection();
+			};
+
+			fileStream.on('data', onData);
+			fileStream.once('end', onEndOrClose);
+			fileStream.once('close', onEndOrClose);
+			fileStream.resume();
+		});
+
+		if (!mimeType) {
+			busboy.emit('error', new InvalidPayloadError({ reason: `Unable to detect file type` }));
+			return;
 		}
 
 		const allowedPatterns = toArray(env['FILES_MIME_TYPE_ALLOW_LIST'] as string | string[]);
 		const mimeTypeAllowed = allowedPatterns.some((pattern) => minimatch(mimeType, pattern));
 
 		if (mimeTypeAllowed === false) {
-			return busboy.emit('error', new InvalidPayloadError({ reason: `File is of invalid content type` }));
+			busboy.emit('error', new InvalidPayloadError({ reason: `File is of invalid content type` }));
+			return;
 		}
-
-		fileCount++;
 
 		if (!existingPrimaryKey) {
 			if (!payload.title) {
@@ -103,11 +166,19 @@ export const multipartHandler: RequestHandler = (req, res, next) => {
 			storage: payload.storage || disk,
 		};
 
+		const passthrough = new PassThrough();
+
+		if (chunks.length) {
+			passthrough.write(Buffer.concat(chunks, collected));
+		}
+
+		fileStream.pipe(passthrough);
+
 		// Clear the payload for the next to-be-uploaded file
 		payload = {};
 
 		try {
-			const primaryKey = await service.uploadOne(fileStream, payloadWithRequiredFields, existingPrimaryKey);
+			const primaryKey = await service.uploadOne(passthrough as unknown as BusboyFileStream, payloadWithRequiredFields, existingPrimaryKey);
 			savedFiles.push(primaryKey);
 			tryDone();
 		} catch (error: any) {

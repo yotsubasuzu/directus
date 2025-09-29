@@ -6,16 +6,19 @@
 FROM node:18-alpine AS builder
 WORKDIR /directus
 
-ARG TARGETPLATFORM
+# ARG TARGETPLATFORM
 
 ENV NODE_OPTIONS=--max-old-space-size=8192
 
-RUN <<EOF
-  if [ "$TARGETPLATFORM" = 'linux/arm64' ]; then
-  	apk --no-cache add python3 build-base
-  	ln -sf /usr/bin/python3 /usr/bin/python
-  fi
-EOF
+#RUN <<EOF
+#  if [ "$TARGETPLATFORM" = 'linux/arm64' ]; then
+#  	apk --no-cache add python3 build-base
+#  	ln -sf /usr/bin/python3 /usr/bin/python
+#  fi
+#EOF
+
+RUN apk --no-cache add python3 py3-setuptools build-base file-dev \
+  && ln -sf /usr/bin/python3 /usr/bin/python
 
 COPY package.json .
 RUN corepack enable && corepack prepare
@@ -42,6 +45,8 @@ EOF
 ## Create Production Image
 
 FROM node:18-alpine AS runtime
+
+RUN apk add --no-cache file
 
 RUN npm install --global pm2@5
 
